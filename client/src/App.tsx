@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Progress {
   upload: number;
@@ -8,6 +8,7 @@ interface Progress {
 }
 
 const App = () => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<Progress>({
     upload: 0,
@@ -24,7 +25,7 @@ const App = () => {
     if (files && files.length > 0) {
       setFile(files[0]);
     } else {
-      setFile(null); // Or handle the case where no file is selected
+      setFile(null); // Handle the case where no file is selected
     }
   };
 
@@ -69,7 +70,13 @@ const App = () => {
         gzipFemale: 0,
       });
       setDownloadLink(null);
-      setError('File processing failed');
+      setError("File processing failed");
+    } finally {
+      setFile(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -87,35 +94,59 @@ const App = () => {
 
   // Combined Progress
   const totalProgress = (
-    (progress.upload + progress.parsing + progress.gzipMale + progress.gzipFemale) /
+    (progress.upload +
+      progress.parsing +
+      progress.gzipMale +
+      progress.gzipFemale) /
     4
   ).toFixed(2);
 
   return (
     <div>
       <h1>File Upload with Progress Tracking</h1>
-      <input type="file" accept=".csv" onChange={handleFileChange} />
-      <button style={{ margin: '0 10px'}}  onClick={handleUpload}>Upload</button>
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-        {downloadLink ? <a style={{ margin: '0 10px'}} href={downloadLink} download="processed-files.zip">
-              Download Processed File
-            </a> : <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        onChange={handleFileChange}
+      />
+      <button style={{ margin: "0 10px" }} onClick={handleUpload}>
+        Upload
+      </button>
+      {error && <p style={{ color: "red" }}>Error: {error}</p>}
+      {downloadLink ? (
+        <a
+          style={{ margin: "0 10px" }}
+          href={downloadLink}
+          download="processed-files.zip"
+        >
+          Download Processed File
+        </a>
+      ) : (
+        <>
           <h3>Overall Progress: {totalProgress}%</h3>
-            <div style={{ border: "1px solid #ccc", width: "100%", marginTop: "10px" }}>
-              <div
-                style={{
-                  width: `${totalProgress}%`,
-                  backgroundColor: "green",
-                  height: "20px",
-                  transition: "width 0.5s",
-                }}
-              ></div>
-            </div>
+          <div
+            style={{
+              border: "1px solid #ccc",
+              width: "100%",
+              marginTop: "10px",
+            }}
+          >
+            <div
+              style={{
+                width: `${totalProgress}%`,
+                backgroundColor: "green",
+                height: "20px",
+                transition: "width 0.5s",
+              }}
+            ></div>
+          </div>
           <p>Upload Progress: {progress.upload}%</p>
           <p>Parsing Progress: {progress.parsing}%</p>
           <p>Male Gzip Progress: {progress.gzipMale}%</p>
           <p>Female Gzip Progress: {progress.gzipFemale}%</p>
-        </>}
+        </>
+      )}
     </div>
   );
 };
