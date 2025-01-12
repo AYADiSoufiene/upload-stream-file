@@ -51,41 +51,46 @@ app.post("/upload", upload.single("file"), (req, res) => {
   let headers = null;
   let totalSize = parseInt(req.headers["content-length"], 10);
   let processedSize = 0;
-  let parsedLines = 0;
   const fileStream = Readable.from(req.file.buffer);
-  const totalLines = req.file.buffer.toString().split("\n").length;
+  const totalBytes = req.file.buffer.byteLength;
 
   const splitterTransform = new Transform({
     readableObjectMode: true,
     writableObjectMode: true,
     remainingData: "",
     transform(chunk, encoding, callback) {
-      const data = this.remainingData
-        ? this.remainingData + chunk.toString()
-        : chunk.toString();
-      const lines = data.split("\n");
-      this.remainingData = lines.pop();
-
       processedSize += chunk.length;
-      updateProgress("upload", (processedSize / totalSize) * 100);
+      updateProgress("upload", (processedSize / totalBytes) * 100);
 
-      if (!headers) {
-        headers = lines.shift().split(",");
-        const headerLine = headers.join(",") + "\n";
-        maleStream.write(headerLine);
-        femaleStream.write(headerLine);
+      let start = 0;
+
+      for (let i = 0; i < chunk.length; i++) {
+        if (chunk[i] === 10) { // ASCII value of '\n'
+          updateProgress("parsing", (i / totalBytes) * 100);
+          const lineBuffer = chunk.slice(start, i);
+          const line = this.remainingData
+            ? this.remainingData + lineBuffer.toString()
+            : lineBuffer.toString();
+          this.remainingData = "";
+
+          if (!headers) {
+            headers = line.split(",");
+            const headerLine = headers.join(",") + "\n";
+            maleStream.write(headerLine);
+            femaleStream.write(headerLine);
+          } else {
+            const columns = line.split(",");
+            const genderIndex = headers.indexOf("gender");
+            if (columns[genderIndex] === "male") maleStream.write(line + "\n");
+            else if (columns[genderIndex] === "female")
+              femaleStream.write(line + "\n");
+          }
+
+          start = i + 1;
+        }
       }
 
-      const genderIndex = headers.indexOf("gender");
-      parsedLines += lines.length;
-      updateProgress("parsing", (parsedLines / totalLines) * 100);
-
-      lines.forEach((line) => {
-        const columns = line.split(",");
-        if (columns[genderIndex] === "male") maleStream.write(line + "\n");
-        else if (columns[genderIndex] === "female")
-          femaleStream.write(line + "\n");
-      });
+      this.remainingData += chunk.slice(start).toString();
 
       callback();
     },
